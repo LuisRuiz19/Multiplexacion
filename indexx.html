@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Multiplexación</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            padding: 20px;
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        h2 { color: #007bff; }
+        
+        /* Estilos para las visualizaciones */
+        .channel {
+            width: 100%;
+            height: 60px;
+            background: #e9ecef;
+            border: 2px solid #ced4da;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* TDM Animation */
+        .tdm-container { display: flex; width: 100%; }
+        .tdm-block {
+            flex: 1;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .user1 { background-color: #e74c3c; }
+        .user2 { background-color: #3498db; }
+        .user3 { background-color: #2ecc71; }
+        
+        /* FDM Visual */
+        .fdm-channel {
+            height: 100px;
+            position: relative;
+        }
+        .wave {
+            position: absolute;
+            width: 100%;
+            height: 20px;
+            left: 0;
+            opacity: 0.8;
+        }
+        .wave1 { top: 10px; border-top: 3px solid #e74c3c; border-bottom: 3px solid #e74c3c; }
+        .wave2 { top: 40px; border-top: 3px dotted #3498db; border-bottom: 3px dotted #3498db; }
+        .wave3 { top: 70px; border-top: 3px dashed #2ecc71; border-bottom: 3px dashed #2ecc71; }
+        
+        /* WDM Visual */
+        .wdm-fiber {
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+        .light-beam {
+            width: 80%;
+            height: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+            background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+            animation: pulse 2s infinite;
+        }
+        
+        /* CDM Visual */
+        .cdm-mix {
+            background-image: repeating-linear-gradient(45deg, #e74c3c 0, #e74c3c 10px, #3498db 10px, #3498db 20px);
+            opacity: 0.7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cdm-text {
+            background: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        .desc { font-size: 0.9em; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Tipos de Multiplexación</h1>
+    <p>Representación visual simplificada de cómo se transmiten los datos en un medio compartido.</p>
+
+    <div class="section">
+        <h2>1. TDM (División de Tiempo)</h2>
+        <p>Los usuarios se turnan. El Usuario 1 pasa, luego el 2, luego el 3, y se repite.</p>
+        <div class="channel">
+            <div class="tdm-container">
+                <div class="tdm-block user1">Usuario 1</div>
+                <div class="tdm-block user2">Usuario 2</div>
+                <div class="tdm-block user3">Usuario 3</div>
+                <div class="tdm-block user1">Usuario 1</div>
+                <div class="tdm-block user2">Usuario 2</div>
+            </div>
+        </div>
+        <p class="desc">Nota: Todo el ancho de banda se usa por breves instantes de tiempo.</p>
+    </div>
+
+    <div class="section">
+        <h2>2. FDM (División de Frecuencia)</h2>
+        <p>Cada usuario tiene su propio "carril" o frecuencia. Todos viajan juntos al mismo tiempo sin chocarse.</p>
+        <div class="channel fdm-channel" style="background: #f8f9fa;">
+            <div class="wave wave1"></div>
+            <div class="wave wave2"></div>
+            <div class="wave wave3"></div>
+        </div>
+        <p class="desc">Nota: Se requieren bandas de guarda (espacios) entre las ondas para evitar interferencia.</p>
+    </div>
+
+    <div class="section">
+        <h2>3. WDM (División de Longitud de Onda)</h2>
+        <p>Exclusivo de Fibra Óptica. Múltiples colores de luz viajan por el mismo hilo de vidrio.</p>
+        <div class="channel wdm-fiber">
+            <div class="light-beam"></div>
+        </div>
+        <p class="desc">Nota: Cada color lleva datos diferentes a velocidades extremas.</p>
+    </div>
+
+    <div class="section">
+        <h2>4. CDM (División de Código)</h2>
+        <p>Todos transmiten a la vez en la misma frecuencia, pero con un "código" o patrón matemático único.</p>
+        <div class="channel cdm-mix">
+            <span class="cdm-text">SEÑAL CODIFICADA MEZCLADA</span>
+        </div>
+        <p class="desc">Nota: Solo quien tiene el código puede separar la señal azul de la roja dentro de la mezcla.</p>
+    </div>
+</div>
+
+</body>
+</html>
