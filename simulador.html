@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulador de Códigos de Línea - Ing. Sistemas</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        .input-group { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        input[type="text"] { padding: 12px; border: 2px solid #ddd; border-radius: 6px; width: 200px; font-size: 16px; transition: border-color 0.3s; }
+        input[type="text"]:focus { border-color: #3498db; outline: none; }
+        select { padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px; background: white; cursor: pointer; }
+        button { padding: 12px 24px; background-color: #3498db; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background 0.3s; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .canvas-container { overflow-x: auto; padding: 10px; border: 1px solid #eee; border-radius: 6px; margin-top: 20px; }
+        canvas { display: block; margin: 0 auto; }
+        .info { margin-top: 20px; font-size: 0.9em; color: #666; background: #e8f4fc; padding: 15px; border-radius: 6px; border-left: 5px solid #3498db;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Simulador de Códigos de Línea</h1>
+    
+    <div class="input-group">
+        <input type="text" id="bitsInput" value="1100001000000000" placeholder="Ej: 11010000">
+        <select id="encodingType">
+            <option value="NRZ-L">NRZ-L</option>
+            <option value="RZ">RZ (Retorno a Cero)</option>
+            <option value="AMI">AMI</option>
+            <option value="Pseudoternario">Pseudoternario</option>
+            <option value="Manchester">Manchester</option>
+            <option value="ManchesterDiff">Manchester Diferencial</option>
+            <option value="B8ZS">B8ZS</option>
+            <option value="HDB3">HDB3</option>
+        </select>
+        <button onclick="renderSignal()">Generar Señal</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="signalCanvas" width="1000" height="300"></canvas>
+    </div>
+
+    <div class="info" id="description">
+        Selecciona un código y pulsa "Generar Señal" para ver la forma de onda.
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('signalCanvas');
+    const ctx = canvas.getContext('2d');
+    const BIT_WIDTH = 50;
+    const HIGH = 50;
+    const ZERO = 150;
+    const LOW = 250;
+
+    function renderSignal() {
+        let input = document.getElementById('bitsInput').value.trim();
+        // Limpiar input de caracteres no binarios
+        input = input.replace(/[^01]/g, '');
+        document.getElementById('bitsInput').value = input;
+        
+        const type = document.getElementById('encodingType').value;
+        const bits = input.split('').map(Number);
+        
+        // Ajustar ancho del canvas
+        canvas.width = Math.max(1000, bits.length * BIT_WIDTH + 50);
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid(bits.length);
+        
+        ctx.beginPath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#e74c3c'; // Color de la línea (Rojo ingenieria)
+        
+        let x = 10;
+        let lastLevel = ZERO; // Para mantener continuidad visual
+        
+        // Estado inicial
+        ctx.moveTo(x, ZERO);
+
+        // Lógica específica para cada código
+        // Pre-cálculo de niveles para códigos complejos
+        let levels = []; 
+
+        if (type === 'HDB3' || type === 'B8ZS' || type === 'AMI' || type === 'Pseudoternario') {
+            levels = calculateBipolar(bits, type);
+            drawLevels(levels, x);
+        } else if (type.includes('Manchester')) {
+            drawManchester(bits, type, x);
+        } else {
+            drawSimple(bits, type, x);
+        }
+
+        ctx.stroke();
+        updateDescription(type);
+    }
+
+    function drawSimple(bits, type, x) {
+        bits.forEach(bit => {
+            let y1, y2;
+            if (type === 'NRZ-L') {
+                y1 = (bit === 0) ? HIGH : LOW; // Asumiendo 0=Alto (puede variar según libro)
+                y2 = y1;
+                ctx.lineTo(x, y1);
+                ctx.lineTo(x + BIT_WIDTH, y2);
+            } else if (type === 'RZ') {
+                if (bit === 1) {
+                    ctx.lineTo(x, HIGH);
+                    ctx.lineTo(x + BIT_WIDTH/2, HIGH);
+                    ctx.lineTo(x + BIT_WIDTH/2, ZERO);
+                    ctx.lineTo(x + BIT_WIDTH, ZERO);
+                } else {
+                    ctx.lineTo(x, ZERO);
+                    ctx.lineTo(x + BIT_WIDTH, ZERO);
+                }
+            }
+            x += BIT_WIDTH;
+        });
+    }
+
+    function drawManchester(bits, type, x) {
+        let lastState = LOW; // Estado inicial para Diferencial
+        
+        bits.forEach((bit, i) => {
+            if (type === 'Manchester') {
+                // IEEE 802.3: 0 = Alto->Bajo, 1 = Bajo->Alto
+                let startY = (bit === 0) ? HIGH : LOW;
+                let endY = (bit === 0) ? LOW : HIGH;
+                
+                ctx.lineTo(x, startY);
+                ctx.lineTo(x + BIT_WIDTH/2, startY);
+                ctx.lineTo(x + BIT_WIDTH/2, endY);
+                ctx.lineTo(x + BIT_WIDTH, endY);
+                
+            } else { // Diferencial
+                // 0 = Transición al inicio, 1 = Sin transición al inicio
+                let nextStart;
+                if (bit === 0) {
+                    nextStart = (lastState === HIGH) ? LOW : HIGH;
+                } else {
+                    nextStart = lastState;
+                }
+                
+                let nextEnd = (nextStart === HIGH) ? LOW : HIGH;
+                
+                ctx.lineTo(x, nextStart);
+                ctx.lineTo(x + BIT_WIDTH/2, nextStart);
+                ctx.lineTo(x + BIT_WIDTH/2, nextEnd);
+                ctx.lineTo(x + BIT_WIDTH, nextEnd);
+                lastState = nextEnd;
+            }
+            x += BIT_WIDTH;
+        });
+    }
+
+    function calculateBipolar(bits, type) {
+        let result = []; // Almacena niveles: 1 (Alto), 0 (Cero), -1 (Bajo)
+        let lastPulse = -1; // Último pulso no cero (empezamos asumiendo negativo para que el primero sea positivo)
+        let pulseCount = 0; // Para HDB3 (pulsos desde última sustitución)
+
+        for (let i = 0; i < bits.length; i++) {
+            let bit = bits[i];
+            
+            if (type === 'AMI') {
+                if (bit === 0) result.push(0);
+                else {
+                    lastPulse = -lastPulse;
+                    result.push(lastPulse);
+                }
+            } else if (type === 'Pseudoternario') {
+                // Inverso de AMI: 1 es cero, 0 alterna
+                if (bit === 1) result.push(0);
+                else {
+                    lastPulse = -lastPulse;
+                    result.push(lastPulse);
+                }
+            } else if (type === 'B8ZS') {
+                // Checar secuencia de 8 ceros
+                if (bit === 0 && checkZeros(bits, i, 8)) {
+                    // Sustitución 000VB0VB
+                    result.push(0, 0, 0);
+                    result.push(lastPulse); // V (Violación - mismo signo)
+                    result.push(-lastPulse); // B (Relleno - signo opuesto, válido)
+                    lastPulse = -lastPulse; 
+                    result.push(0);
+                    result.push(lastPulse); // V (Violación)
+                    result.push(-lastPulse); // B (Relleno)
+                    lastPulse = -lastPulse;
+                    i += 7; // Saltar los 8 ceros procesados
+                } else {
+                    if (bit === 0) result.push(0);
+                    else {
+                        lastPulse = -lastPulse;
+                        result.push(lastPulse);
+                    }
+                }
+            } else if (type === 'HDB3') {
+                if (bit === 0 && checkZeros(bits, i, 4)) {
+                    // Decidir entre 000V o B00V
+                    // Si el número de pulsos desde la última sustitución es impar: 000V
+                    // Si es par: B00V
+                    // Nota simplificada: usamos el contador pulseCount de unos normales
+                    
+                    let violation = lastPulse; // La violación copia el último pulso
+                    
+                    if (pulseCount % 2 !== 0) {
+                        // Impar: 000V
+                        result.push(0, 0, 0, violation); 
+                        pulseCount = 0; // Reiniciar cuenta de pulsos válidos
+                        // La violación cuenta como pulso para la polaridad física, pero actualizamos lastPulse
+                        lastPulse = violation; 
+                    } else {
+                        // Par: B00V
+                        let filling = -lastPulse; // B invierte
+                        result.push(filling, 0, 0, filling); // El ultimo es la violación (mismo signo que B)
+                        lastPulse = filling; 
+                        pulseCount = 0;
+                    }
+                    i += 3;
+                } else {
+                    if (bit === 0) {
+                        result.push(0);
+                    } else {
+                        lastPulse = -lastPulse;
+                        result.push(lastPulse);
+                        pulseCount++;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    function checkZeros(bits, index, count) {
+        if (index + count > bits.length) return false;
+        for (let j = 0; j < count; j++) {
+            if (bits[index + j] !== 0) return false;
+        }
+        return true;
+    }
+
+    function drawLevels(levels, x) {
+        levels.forEach(level => {
+            let y = (level === 1) ? HIGH : (level === -1) ? LOW : ZERO;
+            ctx.lineTo(x, y);
+            ctx.lineTo(x + BIT_WIDTH, y);
+            x += BIT_WIDTH;
+        });
+    }
+
+    function drawGrid(numBits) {
+        // Línea central 0V
+        ctx.beginPath();
+        ctx.strokeStyle = '#ccc';
+        ctx.setLineDash([5, 5]);
+        ctx.moveTo(0, ZERO);
+        ctx.lineTo(canvas.width, ZERO);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Divisiones de bits
+        ctx.beginPath();
+        ctx.strokeStyle = '#eee';
+        for(let i=0; i<=numBits; i++) {
+            ctx.moveTo(10 + i*BIT_WIDTH, 0);
+            ctx.lineTo(10 + i*BIT_WIDTH, canvas.height);
+        }
+        ctx.stroke();
+    }
+
+    function updateDescription(type) {
+        const desc = document.getElementById('description');
+        let text = "";
+        switch(type) {
+            case 'NRZ-L': text = "<b>NRZ-L:</b> El nivel de voltaje depende directamente del bit (0=Alto, 1=Bajo o viceversa). Sin retorno a cero."; break;
+            case 'RZ': text = "<b>RZ:</b> La señal siempre retorna a cero a la mitad del intervalo del bit. Facilita la sincronización."; break;
+            case 'AMI': text = "<b>AMI:</b> Los 0s son 0V. Los 1s alternan polaridad (+V, -V)."; break;
+            case 'HDB3': text = "<b>HDB3:</b> Como AMI, pero sustituye secuencias de 4 ceros para evitar pérdida de sincronización."; break;
+            case 'B8ZS': text = "<b>B8ZS:</b> Utilizado en T1 (Norteamérica). Sustituye secuencias de 8 ceros con violaciones bipolares."; break;
+            case 'Manchester': text = "<b>Manchester:</b> Siempre hay una transición a mitad del bit. 0 (Alto-Bajo), 1 (Bajo-Alto)."; break;
+            default: text = "Visualización de la señal generada.";
+        }
+        desc.innerHTML = text;
+    }
+</script>
+
+</body>
+</html>
