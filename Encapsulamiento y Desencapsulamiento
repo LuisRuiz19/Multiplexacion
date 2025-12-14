@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Encapsulamiento OSI - Ingeniería de Sistemas</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #e2e8f0;
+            --accent: #3b82f6;
+            --success: #22c55e;
+            --warning: #eab308;
+            --danger: #ef4444;
+            --panel-bg: #1e293b;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Fuente tipo terminal */
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { color: var(--accent); text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+
+        .controls {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: #0f172a;
+            color: white;
+            width: 300px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover { background: #2563eb; }
+        button:disabled { background: #475569; cursor: not-allowed; }
+
+        .main-stage {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 1200px;
+            gap: 20px;
+        }
+
+        .stack-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .stack-title { text-align: center; font-size: 1.2em; margin-bottom: 10px; font-weight: bold; }
+
+        .layer {
+            padding: 15px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            position: relative;
+            transition: all 0.3s ease;
+            opacity: 0.5;
+        }
+
+        .layer.active {
+            opacity: 1;
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+            background: #1e3a8a; 
+        }
+
+        .layer-name { font-weight: bold; font-size: 0.9em; color: #94a3b8; }
+        .layer-pdu { margin-top: 5px; font-size: 0.8em; color: var(--success); }
+
+        /* El paquete visual que viaja */
+        .packet-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+
+        .header-block {
+            padding: 5px 8px;
+            font-size: 0.8em;
+            color: white;
+            border-radius: 3px;
+            animation: popIn 0.3s ease-out;
+        }
+
+        .data-block { background: var(--success); }
+        .l4-block { background: var(--warning); color: black; } /* Transporte */
+        .l3-block { background: var(--accent); } /* Red */
+        .l2-block { background: var(--danger); } /* Enlace */
+        .phy-block { background: #64748b; font-family: monospace; } /* Física */
+
+        /* El cable de transmisión */
+        .cable-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 20px;
+            width: 10%;
+        }
+
+        .cable-line {
+            width: 100%;
+            height: 4px;
+            background: #475569;
+            position: relative;
+        }
+
+        .bit-stream {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            font-family: monospace;
+            color: var(--accent);
+            white-space: nowrap;
+            font-size: 10px;
+            opacity: 0;
+        }
+
+        /* Consola de logs */
+        .console-log {
+            width: 100%;
+            max-width: 1200px;
+            height: 150px;
+            background: #000;
+            border: 1px solid #333;
+            margin-top: 20px;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #00d4ff;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes moveBits {
+            0% { left: 0; opacity: 1; }
+            100% { left: 100%; opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Simulador de Flujo de Datos OSI</h1>
+    
+    <div class="controls">
+        <input type="text" id="userMessage" placeholder="Escribe tu mensaje (ej. Hola Mundo)" value="Hola Mundo">
+        <button onclick="startSimulation()" id="btnSend">Enviar Datos</button>
+        <button onclick="resetSimulation()" style="background: #475569;">Reset</button>
+    </div>
+
+    <div class="main-stage">
+        <div class="stack-container" id="senderStack">
+            <div class="stack-title">EMISOR (Tu PC)</div>
+            <div class="layer" id="s-layer7">
+                <div class="layer-name">7, 6, 5. APLICACIÓN/SESIÓN</div>
+                <div class="layer-pdu">Datos</div>
+                <div class="packet-display" id="s-pdu-7"></div>
+            </div>
+            <div class="layer" id="s-layer4">
+                <div class="layer-name">4. TRANSPORTE</div>
+                <div class="layer-pdu">Segmento</div>
+                <div class="packet-display" id="s-pdu-4"></div>
+            </div>
+            <div class="layer" id="s-layer3">
+                <div class="layer-name">3. RED</div>
+                <div class="layer-pdu">Paquete</div>
+                <div class="packet-display" id="s-pdu-3"></div>
+            </div>
+            <div class="layer" id="s-layer2">
+                <div class="layer-name">2. ENLACE DE DATOS</div>
+                <div class="layer-pdu">Trama</div>
+                <div class="packet-display" id="s-pdu-2"></div>
+            </div>
+            <div class="layer" id="s-layer1">
+                <div class="layer-name">1. FÍSICA</div>
+                <div class="layer-pdu">Bits</div>
+                <div class="packet-display" id="s-pdu-1"></div>
+            </div>
+        </div>
+
+        <div class="cable-section">
+            <div style="font-size: 30px;">➡️</div>
+            <div class="cable-line">
+                <div class="bit-stream" id="transmissionBits">10110010101...</div>
+            </div>
+        </div>
+
+        <div class="stack-container" id="receiverStack">
+            <div class="stack-title">RECEPTOR (Servidor)</div>
+            <div class="layer" id="r-layer7">
+                <div class="layer-name">7, 6, 5. APLICACIÓN/SESIÓN</div>
+                <div class="packet-display" id="r-pdu-7"></div>
+            </div>
+            <div class="layer" id="r-layer4">
+                <div class="layer-name">4. TRANSPORTE</div>
+                <div class="packet-display" id="r-pdu-4"></div>
+            </div>
+            <div class="layer" id="r-layer3">
+                <div class="layer-name">3. RED</div>
+                <div class="packet-display" id="r-pdu-3"></div>
+            </div>
+            <div class="layer" id="r-layer2">
+                <div class="layer-name">2. ENLACE DE DATOS</div>
+                <div class="packet-display" id="r-pdu-2"></div>
+            </div>
+            <div class="layer" id="r-layer1">
+                <div class="layer-name">1. FÍSICA</div>
+                <div class="packet-display" id="r-pdu-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="console-log" id="consoleLog">
+        > Sistema listo. Esperando entrada de datos...
+    </div>
+
+    <script>
+        const logBox = document.getElementById('consoleLog');
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.textContent = `> ${msg}`;
+            logBox.appendChild(line);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function clearLayers() {
+            document.querySelectorAll('.layer').forEach(l => l.classList.remove('active'));
+            document.querySelectorAll('.packet-display').forEach(d => d.innerHTML = '');
+            document.getElementById('transmissionBits').style.opacity = 0;
+            document.getElementById('transmissionBits').style.animation = 'none';
+        }
+
+        function createBlock(text, type) {
+            const div = document.createElement('div');
+            div.className = `header-block ${type}`;
+            div.innerText = text;
+            return div;
+        }
+
+        async function startSimulation() {
+            const msg = document.getElementById('userMessage').value;
+            if(!msg) return alert("Escribe un mensaje");
+
+            document.getElementById('btnSend').disabled = true;
+            clearLayers();
+            log("Iniciando transmisión de: " + msg);
+
+            // --- ENCAPSULAMIENTO (BAJADA) ---
+            
+            // CAPA 7
+            await highlightLayer('s', 7, "Capa Aplicación: Generando datos brutos (HTTP GET/POST)...");
+            let pdu7 = document.getElementById('s-pdu-7');
+            pdu7.appendChild(createBlock(msg, 'data-block'));
+            await delay(1500);
+
+            // CAPA 4
+            await highlightLayer('s', 4, "Capa Transporte: Segmentación. Agregando Header TCP (Puertos).");
+            let pdu4 = document.getElementById('s-pdu-4');
+            pdu4.appendChild(createBlock("TCP Hdr", 'l4-block'));
+            pdu4.appendChild(createBlock(msg, 'data-block'));
+            await delay(1500);
+
+            // CAPA 3
+            await highlightLayer('s', 3, "Capa Red: Enrutamiento. Agregando Header IP (Origen/Destino).");
+            let pdu3 = document.getElementById('s-pdu-3');
+            pdu3.appendChild(createBlock("IP Hdr", 'l3-block'));
+            pdu3.appendChild(createBlock("TCP", 'l4-block'));
+            pdu3.appendChild(createBlock("Datos", 'data-block'));
+            await delay(1500);
+
+            // CAPA 2
+            await highlightLayer('s', 2, "Capa Enlace: Tramado. Agregando MAC y Trailer FCS (Control de errores).");
+            let pdu2 = document.getElementById('s-pdu-2');
+            pdu2.appendChild(createBlock("MAC Hdr", 'l2-block'));
+            pdu2.appendChild(createBlock("Paquete IP", 'l3-block'));
+            pdu2.appendChild(createBlock("FCS", 'l2-block')); // Trailer
+            await delay(1500);
+
+            // CAPA 1
+            await highlightLayer('s', 1, "Capa Física: Conversión a señales eléctricas/ópticas (Bits).");
+            let pdu1 = document.getElementById('s-pdu-1');
+            pdu1.appendChild(createBlock("10110101001...", 'phy-block'));
+            await delay(1000);
+
+            // --- TRANSMISIÓN ---
+            log("TRANSMITIENDO POR EL MEDIO...");
+            const bits = document.getElementById('transmissionBits');
+            bits.style.animation = 'moveBits 2s linear forwards';
+            bits.style.opacity = 1;
+            await delay(2000);
+
+            // --- DESENCAPSULAMIENTO (SUBIDA) ---
+            
+            // CAPA 1 RECEPTOR
+            await highlightLayer('r', 1, "Receptor Capa Física: Bits recibidos y sincronizados.");
+            let rpdu1 = document.getElementById('r-pdu-1');
+            rpdu1.appendChild(createBlock("10110101001...", 'phy-block'));
+            await delay(1500);
+
+            // CAPA 2 RECEPTOR
+            await highlightLayer('r', 2, "Receptor Capa Enlace: Verificando MAC y FCS. Quitando trama Ethernet.");
+            let rpdu2 = document.getElementById('r-pdu-2');
+            rpdu2.appendChild(createBlock("IP Hdr", 'l3-block'));
+            rpdu2.appendChild(createBlock("TCP", 'l4-block'));
+            rpdu2.appendChild(createBlock("Datos", 'data-block'));
+            await delay(1500);
+
+            // CAPA 3 RECEPTOR
+            await highlightLayer('r', 3, "Receptor Capa Red: Verificando IP destino. Quitando encabezado IP.");
+            let rpdu3 = document.getElementById('r-pdu-3');
+            rpdu3.appendChild(createBlock("TCP Hdr", 'l4-block'));
+            rpdu3.appendChild(createBlock("Datos", 'data-block'));
+            await delay(1500);
+
+            // CAPA 4 RECEPTOR
+            await highlightLayer('r', 4, "Receptor Capa Transporte: Verificando puertos y orden. Quitando TCP.");
+            let rpdu4 = document.getElementById('r-pdu-4');
+            rpdu4.appendChild(createBlock(msg, 'data-block'));
+            await delay(1500);
+
+            // CAPA 7 RECEPTOR
+            await highlightLayer('r', 7, "Receptor Capa Aplicación: Interpretando y mostrando el mensaje.");
+            let rpdu7 = document.getElementById('r-pdu-7');
+            rpdu7.appendChild(createBlock(msg, 'data-block'));
+            rpdu7.style.transform = "scale(1.2)";
+            
+            log("¡PROCESO COMPLETADO EXITOSAMENTE!");
+            document.getElementById('btnSend').disabled = false;
+        }
+
+        async function highlightLayer(side, layerNum, message) {
+            // side: 's' (sender) or 'r' (receiver)
+            // Desactivar capas previas de ese lado
+            document.querySelectorAll(`#${side === 's' ? 'senderStack' : 'receiverStack'} .layer`).forEach(l => l.classList.remove('active'));
+            
+            // Activar actual
+            const layer = document.getElementById(`${side}-layer${layerNum}`);
+            layer.classList.add('active');
+            log(message);
+        }
+
+        function resetSimulation() {
+            clearLayers();
+            log("Sistema reiniciado.");
+            document.getElementById('btnSend').disabled = false;
+        }
+    </script>
+</body>
+</html>
